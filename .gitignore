@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# local database and env
+*.db
+*.db-wal
+*.db-shm
+.env
+
+.DS_Store
+.vscode/
+.idea/

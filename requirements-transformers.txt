@@ -1,0 +1,3 @@
+# Optional heavier backend (SENTIMENT_BACKEND=transformers). Not installed by default.
+transformers>=4.40,<5
+torch>=2.2,<3
