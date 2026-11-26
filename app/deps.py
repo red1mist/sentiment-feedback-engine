@@ -7,7 +7,8 @@ from dataclasses import dataclass
 from typing import Iterator
 
 import jwt
-from fastapi import Depends, Header, Request, Response
+from fastapi import Depends, Request, Response
+from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
 from .db import connect
 from .errors import ApiError
@@ -27,8 +28,13 @@ def get_db(request: Request) -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
+# Declared as OpenAPI security schemes so /docs offers an "Authorize" dialog.
+admin_key_scheme = APIKeyHeader(name="X-Admin-Key", auto_error=False, scheme_name="AdminKey")
+bearer_scheme = HTTPBearer(auto_error=False, scheme_name="ClientToken")
+
+
 def require_admin(settings: Settings = Depends(get_settings),
-                  x_admin_key: str | None = Header(default=None, alias="X-Admin-Key")) -> None:
+                  x_admin_key: str | None = Depends(admin_key_scheme)) -> None:
     if not x_admin_key or not safe_equal(x_admin_key, settings.admin_api_key):
         raise ApiError(403, "forbidden", "invalid admin key")
 
@@ -40,12 +46,11 @@ class AuthedClient:
 
 
 def current_client(settings: Settings = Depends(get_settings),
-                   authorization: str | None = Header(default=None)) -> AuthedClient:
-    scheme, _, token = (authorization or "").partition(" ")
-    if scheme != "Bearer" or not token:
+                   credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme)) -> AuthedClient:
+    if credentials is None or not credentials.credentials:
         raise ApiError(401, "unauthorized", "missing bearer token")
     try:
-        payload = verify_token(token, secret=settings.jwt_secret)
+        payload = verify_token(credentials.credentials, secret=settings.jwt_secret)
     except jwt.ExpiredSignatureError:
         raise ApiError(401, "unauthorized", "token expired")
     except jwt.PyJWTError:
